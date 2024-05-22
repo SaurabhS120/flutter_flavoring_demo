@@ -1,6 +1,36 @@
 import 'package:flutter/material.dart';
-
-void main() {
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_crashlytics/firebase_crashlytics.dart';
+import 'package:flutter/foundation.dart';
+import 'package:flutter_flavoring_demo/firebase_messaging_helper.dart';
+import 'package:flutter_flavoring_demo/notification_helper_interface.dart';
+import 'package:flutter_flavoring_demo/notifications.dart';
+void main() async{
+  WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp();
+  FlutterError.onError = (errorDetails) {
+    FirebaseCrashlytics.instance.recordFlutterFatalError(errorDetails);
+  };
+  // Pass all uncaught asynchronous errors that aren't handled by the Flutter framework to Crashlytics
+  PlatformDispatcher.instance.onError = (error, stack) {
+    FirebaseCrashlytics.instance.recordError(error, stack, fatal: true);
+    return true;
+  };
+  ///Crash analytics only for debug
+  //Else it will report in development
+  await FirebaseCrashlytics.instance.setCrashlyticsCollectionEnabled(!kDebugMode);
+  ///Secure storage call on app start
+  // Will clear storage on version update to solve data corruption issue
+  NotificationHelperInterface notificationHelperInterface = NotificationsDI.getNotificationHelper();
+  FirebaseCloudMessagingHelper firebaseCloudMessagingHelper = NotificationsDI.getCloudMessagingHelper();
+  notificationHelperInterface.setup();
+  firebaseCloudMessagingHelper.setupFirebaseMessaging();
+  firebaseCloudMessagingHelper.setInboxCallback((){
+    String? notificationId = firebaseCloudMessagingHelper.getNotificationId();
+    debugPrint("Notification id : $notificationId");
+  });
+  String fcmToken = await firebaseCloudMessagingHelper.getToken()??'';
+  print("fcmToken:$fcmToken");
   runApp(const MyApp());
 }
 
@@ -45,6 +75,7 @@ class MyHomePage extends StatefulWidget {
 
   @override
   State<MyHomePage> createState() => _MyHomePageState();
+
 }
 
 class _MyHomePageState extends State<MyHomePage> {
